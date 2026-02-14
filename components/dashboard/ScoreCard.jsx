@@ -19,9 +19,9 @@ export default function ScoreCard() {
                     <div className="text-sm text-gray-400 max-w-[200px]">
                         Your site produces <strong className="text-white">1.8g</strong> of CO2 per visit. That's dirtier than 76% of the web.
                     </div>
-                    <button className="h-12 w-12 rounded-full bg-white text-black flex items-center justify-center hover:scale-110 transition-transform shadow-lg shadow-primary/20">
+                    {/* <button className="h-12 w-12 rounded-full bg-white text-black flex items-center justify-center hover:scale-110 transition-transform shadow-lg shadow-primary/20">
                         <span className="material-symbols-outlined">arrow_forward</span>
-                    </button>
+                    </button> */}
                 </div>
             </div>
         </div>
