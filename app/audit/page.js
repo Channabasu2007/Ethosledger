@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+// Components (ensure these are updated to handle null/loading states)
 import ScoreCard from "@/components/dashboard/ScoreCard";
 import RotRadarWidget from "@/components/dashboard/RotRadarWidget";
 import MetricTiles from "@/components/dashboard/MetricTiles";
@@ -11,71 +12,103 @@ import CodeAnalysisWidget from "@/components/dashboard/CodeAnalysisWidget";
 function AuditContent() {
     const searchParams = useSearchParams();
     const urlParam = searchParams.get('url');
-    const [url, setUrl] = useState(urlParam || 'google.com');
+    
+    const [url] = useState(urlParam || '');
     const [scanning, setScanning] = useState(true);
     const [scanProgress, setScanProgress] = useState(0);
-    const [scanStep, setScanStep] = useState("Initializing...");
+    const [scanStep, setScanStep] = useState("Initializing Headless Browser...");
+    const [auditData, setAuditData] = useState(null);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
-        if (!scanning) return;
+        if (!url) {
+            setError("No URL provided for audit.");
+            setScanning(false);
+            return;
+        }
 
-        const steps = [
-            { pct: 10, msg: "Resolving DNS..." },
-            { pct: 30, msg: "Analyzing Network Waterfalls..." },
-            { pct: 50, msg: "De-obfuscating JavaScript..." },
-            { pct: 70, msg: "Measuring Carbon Footprint..." },
-            { pct: 90, msg: "Generating Report..." },
-            { pct: 100, msg: "Complete" }
-        ];
+        let isMounted = true;
 
-        let currentStep = 0;
+        const performAudit = async () => {
+            try {
+                // The progress bar now represents the actual request lifecycle
+                setScanProgress(20);
+                setScanStep("Establishing Secure Connection...");
 
-        const interval = setInterval(() => {
-            setScanProgress(prev => {
-                if (prev >= 100) {
-                    clearInterval(interval);
-                    setTimeout(() => setScanning(false), 500);
-                    return 100;
+                const response = await fetch(`/api/audit?url=${encodeURIComponent(url)}`);
+                
+                setScanProgress(60);
+                setScanStep("Analyzing DOM & Network Payloads...");
+
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.error || 'Audit failed');
+
+                if (isMounted) {
+                    setAuditData(data);
+                    setScanProgress(100);
+                    setScanStep("Report Generated Successfully");
+                    
+                    // Final transition
+                    setTimeout(() => setScanning(false), 600);
                 }
+            } catch (err) {
+                if (isMounted) {
+                    setError(err.message);
+                    setScanning(false);
+                }
+            }
+        };
 
-                // Update message based on progress
-                const nextStep = steps.find(s => s.pct > prev && s.pct <= prev + 5);
-                if (nextStep) setScanStep(nextStep.msg);
+        performAudit();
 
-                return prev + 2; // Increment speed
-            });
-        }, 50);
+        return () => { isMounted = false; };
+    }, [url]);
 
-        return () => clearInterval(interval);
-    }, [scanning]);
+    if (error) {
+        return (
+            <div className="min-h-screen bg-background-dark flex flex-col items-center justify-center text-white p-6 font-mono">
+                <div className="text-red-500 mb-4 text-6xl">![Error Icon]</div>
+                <h2 className="text-2xl font-bold mb-2 uppercase tracking-widest">Audit Terminal Error</h2>
+                <p className="text-gray-400 mb-6 border border-red-500/50 p-4 bg-red-500/10">{error}</p>
+                <button onClick={() => window.location.href = '/'} className="px-6 py-2 bg-white text-black rounded-none font-bold hover:bg-primary transition-colors">
+                    RETURN TO BASE
+                </button>
+            </div>
+        );
+    }
 
     if (scanning) {
         return (
             <div className="min-h-screen bg-background-dark flex flex-col items-center justify-center font-mono relative overflow-hidden">
+                {/* Visual Scanner Overlay */}
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-overlay"></div>
+                
                 <div className="z-10 text-center space-y-8 max-w-lg w-full px-6">
-                    <div className="relative">
-                        <div className="w-24 h-24 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-8"></div>
-                        <div className="absolute inset-0 flex items-center justify-center font-bold text-primary">{scanProgress}%</div>
+                    <div className="relative inline-block">
+                        <div className="w-32 h-32 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-8"></div>
+                        <div className="absolute inset-0 flex items-center justify-center font-bold text-xl text-primary">
+                            {scanProgress}%
+                        </div>
                     </div>
 
-                    <h2 className="text-3xl font-bold text-white tracking-tight animate-pulse">Scanning {url}...</h2>
+                    <div className="space-y-2">
+                        <h2 className="text-xl font-bold text-white tracking-[0.2em] uppercase">Auditing Target</h2>
+                        <p className="text-primary animate-pulse truncate">{url}</p>
+                    </div>
 
-                    <div className="w-full bg-surface-dark h-2 rounded-full overflow-hidden border border-white/10">
+                    <div className="w-full bg-surface-dark/50 h-1 rounded-full overflow-hidden border border-white/5">
                         <div
-                            className="h-full bg-primary transition-all duration-100 ease-out shadow-[0_0_15px_rgba(26,224,181,0.5)]"
+                            className="h-full bg-primary transition-all duration-700 ease-in-out shadow-[0_0_15px_rgba(26,224,181,0.8)]"
                             style={{ width: `${scanProgress}%` }}
                         ></div>
                     </div>
 
-                    <p className="text-primary/70 text-sm h-6">{scanStep}</p>
-
-                    <div className="text-left bg-black/50 p-4 rounded-lg border border-white/5 font-mono text-xs text-gray-500 h-32 overflow-hidden flex flex-col-reverse">
-                        <p>{`> waiting for header response...`}</p>
-                        <p>{`> GET ${url} HTTP/1.1`}</p>
-                        <p>{`> establishing secure connection...`}</p>
-                        <p className="text-primary">{`> target acquired: ${url}`}</p>
-                        <p>{`> initializing ethos_scanner_v2...`}</p>
+                    <div className="text-left bg-black/80 p-6 border border-primary/20 font-mono text-[10px] text-gray-400 space-y-1">
+                        <p className="text-primary-brightness-50">{`> STAGE: ${scanStep}`}</p>
+                        <p>{`> TRACE_ID: ${Math.random().toString(36).substring(7).toUpperCase()}`}</p>
+                        <p>{`> PACKET_LOSS: 0%`}</p>
+                        <p className="text-white/50">{`> ANALYZING_BYTES: TRUE`}</p>
                     </div>
                 </div>
             </div>
@@ -83,53 +116,54 @@ function AuditContent() {
     }
 
     return (
-        <div className="min-h-screen bg-background-light dark:bg-background-dark text-slate-900 dark:text-white flex flex-col font-display selection:bg-primary selection:text-black">
-            {/* Main Container */}
-            <div className="flex-1 flex flex-col h-full layout-container p-4 md:p-6 lg:p-8 pb-32">
-                {/* Header - Custom for Dashboard */}
-                <header className="flex items-center justify-between mb-8 px-2 animate-fade-in-up">
-                    <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2 text-primary/80 mb-1">
-                            <span className="material-symbols-outlined text-xl">language</span>
-                            <span className="text-sm font-medium uppercase tracking-wider">Audit Report</span>
+        <div className="min-h-screen bg-background-dark text-white flex flex-col font-mono selection:bg-primary selection:text-black">
+            <div className="flex-1 flex flex-col h-full p-4 md:p-8">
+                <header className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6 border-b border-white/10 pb-8">
+                    <div>
+                        <div className="flex items-center gap-2 text-primary mb-2">
+                            <span className="w-2 h-2 bg-primary rounded-full animate-ping"></span>
+                            <span className="text-xs font-bold uppercase tracking-widest">Live Audit Verified</span>
                         </div>
-                        <h1 className="text-4xl md:text-5xl font-bold tracking-tight">{url}</h1>
-                        <p className="text-gray-400 text-sm mt-1 flex items-center gap-2">
-                            <span className="inline-block w-2 h-2 rounded-full bg-red-500"></span>
-                            Audit completed on {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </p>
+                        <h1 className="text-4xl md:text-6xl font-black tracking-tighter truncate max-w-2xl">{url}</h1>
                     </div>
-
-                    <div className="flex gap-4">
-                        <button className="flex items-center gap-2 px-4 py-2 bg-surface-dark border border-white/5 rounded-full text-xs font-bold uppercase tracking-wider text-gray-400 hover:text-primary hover:border-primary/50 transition-all cursor-pointer">
-                            <span className="material-symbols-outlined text-lg">code</span>
-                            View Code
-                        </button>
-                        <button className="flex items-center gap-2 px-4 py-2 bg-primary text-black rounded-full text-xs font-bold uppercase tracking-wider hover:bg-white transition-colors shadow-[0_0_15px_rgba(26,224,181,0.3)] cursor-pointer">
-                            <span className="material-symbols-outlined text-lg">download</span>
-                            Report
-                        </button>
+                    
+                    <div className="flex items-center gap-4 text-xs text-gray-500 italic">
+                        <span>Report Ref: {auditData?.timestamp?.split('T')[0]}</span>
+                        <div className="h-4 w-[1px] bg-white/10"></div>
+                        <span>Latency: {auditData?.metrics?.loadTimeSeconds}s</span>
                     </div>
                 </header>
 
-                {/* Bento Grid Layout */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-min animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-                    <ScoreCard />
-                    <RotRadarWidget />
-                    <MetricTiles />
-                    <BloatTimelineWidget />
-                    <CodeAnalysisWidget />
+                {/* The Dashboard Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 auto-rows-min">
+                    <ScoreCard 
+                        grade={auditData?.grade} 
+                        score={auditData?.score} 
+                    />
+                    <RotRadarWidget 
+                        trackers={auditData?.analysis} 
+                    />
+                    <MetricTiles 
+                        weight={auditData?.metrics?.pageWeightMB} 
+                        co2={auditData?.metrics?.co2Grams} 
+                        trackers={auditData?.metrics?.trackerCount}
+                    />
+                    <BloatTimelineWidget 
+                        loadTime={auditData?.metrics?.loadTimeSeconds} 
+                    />
+                    <CodeAnalysisWidget 
+                        url={url} 
+                        analysis={auditData?.analysis} 
+                    />
                 </div>
             </div>
-
-
         </div>
     );
 }
 
 export default function AuditPage() {
     return (
-        <Suspense fallback={<div className="min-h-screen bg-background-dark flex items-center justify-center text-primary">Loading...</div>}>
+        <Suspense fallback={<div className="min-h-screen bg-background-dark flex items-center justify-center text-primary font-mono">LOADING TERMINAL...</div>}>
             <AuditContent />
         </Suspense>
     );
