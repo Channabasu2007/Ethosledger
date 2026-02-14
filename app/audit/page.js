@@ -11,43 +11,26 @@ import CodeAnalysisWidget from "@/components/dashboard/CodeAnalysisWidget";
 function AuditContent() {
     const searchParams = useSearchParams();
     const urlParam = searchParams.get('url');
+    const [data, setData] = useState(null);
     const [url, setUrl] = useState(urlParam || 'google.com');
     const [scanning, setScanning] = useState(true);
     const [scanProgress, setScanProgress] = useState(0);
     const [scanStep, setScanStep] = useState("Initializing...");
 
     useEffect(() => {
-        if (!scanning) return;
-
-        const steps = [
-            { pct: 10, msg: "Resolving DNS..." },
-            { pct: 30, msg: "Analyzing Network Waterfalls..." },
-            { pct: 50, msg: "De-obfuscating JavaScript..." },
-            { pct: 70, msg: "Measuring Carbon Footprint..." },
-            { pct: 90, msg: "Generating Report..." },
-            { pct: 100, msg: "Complete" }
-        ];
-
-        let currentStep = 0;
-
-        const interval = setInterval(() => {
-            setScanProgress(prev => {
-                if (prev >= 100) {
-                    clearInterval(interval);
-                    setTimeout(() => setScanning(false), 500);
-                    return 100;
-                }
-
-                // Update message based on progress
-                const nextStep = steps.find(s => s.pct > prev && s.pct <= prev + 5);
-                if (nextStep) setScanStep(nextStep.msg);
-
-                return prev + 2; // Increment speed
-            });
-        }, 50);
-
-        return () => clearInterval(interval);
-    }, [scanning]);
+        const fetchData = async () => {
+            try {
+                const res = await fetch(`/api/audit?url=${url}`);
+                const result = await res.json();
+                setData(result);
+                // Allow the "Scanning" UI to finish its animation for drama
+                setTimeout(() => setScanning(false), 2000);
+            } catch (err) {
+                console.error("Audit failed", err);
+            }
+        };
+        fetchData();
+    }, [url]);
 
     if (scanning) {
         return (
@@ -114,11 +97,11 @@ function AuditContent() {
 
                 {/* Bento Grid Layout */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-min animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-                    <ScoreCard />
-                    <RotRadarWidget />
-                    <MetricTiles />
-                    <BloatTimelineWidget />
-                    <CodeAnalysisWidget />
+                    <ScoreCard score={data?.scores?.sustainability} co2={data?.metrics?.co2} />
+                    <RotRadarWidget scores={data?.scores} />
+                    <MetricTiles metrics={data?.metrics} />
+                    <BloatTimelineWidget timeline={data?.timeline} />
+                    <CodeAnalysisWidget trackers={data?.killList} />
                 </div>
             </div>
 
