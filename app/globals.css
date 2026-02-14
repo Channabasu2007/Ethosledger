@@ -56,7 +56,12 @@
     0% { opacity: 0; transform: translateY(20px); }
     100% { opacity: 1; transform: translateY(0); }
   }
+  @keyframes scan {
+    0% { top: 0%; }
+    100% { top: 100%; }
+  }
   --animate-fade-in-up: fade-in-up 0.5s ease-out forwards;
+  --animate-scan: scan 3s linear infinite;
 }
 
 @layer utilities {
@@ -165,5 +170,14 @@
 @layer utilities {
   .layout-container {
       @apply w-full max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8;
+  }
+  .code-scan-line {
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #1ae0b5, transparent);
+      animation: var(--animate-scan);
+      position: absolute;
+      left: 0;
+      right: 0;
+      z-index: 10;
   }
 }
