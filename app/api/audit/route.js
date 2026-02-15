@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import puppeteer from "puppeteer";
 import { co2 } from "@tgwf/co2";
+import connect from '../../../lib/mongoose';
+import Site from '../../../lib/models/Site';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -13,7 +15,7 @@ export async function GET(request) {
   try {
     browser = await puppeteer.launch({
       headless: "new",
-      executablePath: "C:\\Users\\Lenovo\\.cache\\puppeteer\\chrome\\win64-145.0.7632.76\\chrome-win64\\chrome.exe",
+      executablePath: "C:\\Users\\tusha.TUSHAR\\.cache\\puppeteer\\chrome\\win64-145.0.7632.67\\chrome-win64\\chrome.exe",
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
     });
 
@@ -410,6 +412,85 @@ export async function GET(request) {
     const mb = totalBytes / (1024 * 1024);
     const co2Emissions = new co2({ model: "swd" }).perByte(totalBytes);
 
+    // --- SUSTAINABILITY: compute CO2 per visit using simplified OneByte/SWD model ---
+    // Constants (industry averages)
+    const ENERGY_PER_GB = 0.81; // kWh per GB
+    const CARBON_INTENSITY = 442; // g CO2 per kWh (global average)
+
+    // Convert MB -> GB (use decimal MB -> GB to match WebsiteCarbon examples)
+    const gb = mb / 1000; // 2.29 MB => 0.00229 GB
+
+    // Base energy and CO2 (data transfer only)
+    const baseEnergyKwh = gb * ENERGY_PER_GB;
+    const baseCo2Grams = baseEnergyKwh * CARBON_INTENSITY;
+
+    // Parse CPU percent (could be string) and clamp
+    const cpuPct = parseFloat(cpuPercent) || 0;
+    const cpuFactor = Math.min(Math.max(cpuPct, 0), 100) / 100;
+
+    // Simple overhead models (tunable): CPU contributes up to 10% extra at 100% CPU
+    const cpuOverheadGrams = baseCo2Grams * cpuFactor * 0.10;
+    // Each API call adds a small extra (network + backend); assume 0.01 g per call
+    const apiOverheadGrams = apiCallsCount * 0.01;
+    // Trackers add overhead (scripts, extra requests); assume 0.02 g per tracker host
+    const trackerOverheadGrams = (detectedTrackers.size || 0) * 0.02;
+
+    const computedCo2PerView = baseCo2Grams + cpuOverheadGrams + apiOverheadGrams + trackerOverheadGrams;
+
+    // Derive a sustainability score (0 = worst, 100 = best) using an inverse mapping
+    const capped = Math.min(computedCo2PerView, 200); // clamp extreme values
+    const computedScore = Math.round(100 * (1 - capped / 200));
+
+    // Build sustainability object (includes breakdown and source)
+    const sustainability = {
+      source: 'computed',
+      method: 'onebyte_swd_simplified',
+      gb: Number(gb.toFixed(6)),
+      baseCo2Grams: Number(baseCo2Grams.toFixed(6)),
+      cpuOverheadGrams: Number(cpuOverheadGrams.toFixed(6)),
+      apiOverheadGrams: Number(apiOverheadGrams.toFixed(6)),
+      trackerOverheadGrams: Number(trackerOverheadGrams.toFixed(6)),
+      co2PerView: Number(computedCo2PerView.toFixed(6)),
+      score: computedScore,
+    };
+
+    // Derive a numeric sustainability score (0-100). If WebsiteCarbon provided a score, use it; otherwise map per-byte CO2.
+    const sustainabilityScore = sustainability.score ?? Math.round(100 * (1 - Math.min(parseFloat(co2Emissions.toFixed(3)) || 0, 200) / 200));
+
+    // Save audit result to DB (best-effort, don't fail audit on DB error)
+    try {
+      await connect();
+      const host = new URL(targetUrl).hostname;
+      const sitePayload = {
+        url: targetUrl,
+        host,
+        title: seoData?.title?.content || '',
+        score: Math.min(100, seoScore),
+        scores: {
+          sustainability: sustainabilityScore
+        },
+        metrics: {
+          totalWeight: mb.toFixed(2),
+          co2: co2Emissions.toFixed(3),
+          loadTime: finalLoadTime,
+          trackerCount: detectedTrackers.size,
+          apiCalls: apiCallsCount,
+          cpuUsage: cpuPercent,
+          sustainability,
+        },
+      };
+
+      const existing = await Site.findOne({ url: targetUrl });
+      if (existing) {
+        Object.assign(existing, sitePayload);
+        await existing.save();
+      } else {
+        await Site.create(sitePayload);
+      }
+    } catch (dbErr) {
+      console.error('Failed to save audit result to DB:', dbErr?.message || dbErr);
+    }
+
     return NextResponse.json({
       url: targetUrl,
       metrics: {
@@ -419,6 +500,10 @@ export async function GET(request) {
         trackerCount: detectedTrackers.size,
         apiCalls: apiCallsCount,
         cpuUsage: cpuPercent,
+        sustainability,
+      },
+      scores: {
+        sustainability: sustainabilityScore
       },
       seo: {
         score: Math.min(100, seoScore),

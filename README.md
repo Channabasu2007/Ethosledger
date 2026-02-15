@@ -34,3 +34,43 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## MongoDB (local/remote)
+
+This project uses MongoDB to store audit results and the Hall of Shame entries.
+
+1. Create a MongoDB cluster (Atlas) or use an existing MongoDB instance.
+2. Add a database user and note the connection URI. Example (.env.local):
+
+```
+MONGODB_URI=mongodb+srv://<user>:<password>@cluster0.mongodb.net/hallofshame?retryWrites=true&w=majority
+```
+
+3. Start the dev server:
+
+```bash
+pnpm install
+pnpm dev
+```
+
+4. Seed sample data (local/dev) with:
+
+```bash
+curl -X POST http://localhost:3000/api/seed
+```
+
+5. Run an audit (example):
+
+```bash
+curl "http://localhost:3000/api/audit?url=example.com"
+```
+
+6. View saved Hall of Shame entries:
+
+```bash
+curl http://localhost:3000/api/hall-of-shame
+```
+
+Notes:
+- The connection string is read from `.env.local`.
+- The audit route saves results to MongoDB as a best-effort action; audits will still return results even if DB writes fail.

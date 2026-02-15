@@ -21,6 +21,7 @@ function AuditContent() {
     // UI Progress State
     const [scanProgress, setScanProgress] = useState(0);
     const [scanStep, setScanStep] = useState("Initializing Forensic Engine...");
+    const [trace, setTrace] = useState(null);
 
     useEffect(() => {
         if (!url) {
@@ -76,6 +77,11 @@ function AuditContent() {
         return () => { isMounted = false; };
     }, [url]);
 
+    useEffect(() => {
+        // Generate a client-only trace value to avoid SSR/client mismatch
+        setTrace(`0x${Math.random().toString(16).slice(2, 10).toUpperCase()}`);
+    }, []);
+
     // Error State UI
     if (error) {
         return (
@@ -110,7 +116,7 @@ function AuditContent() {
                     <p className="text-[#1ae0b5]/50 text-[10px] uppercase tracking-widest animate-pulse h-4">{scanStep}</p>
                     <div className="text-left bg-black/60 p-5 rounded-2xl border border-white/5 font-mono text-[9px] text-gray-500 space-y-1">
                         <p>{`> GET ${url} - STATUS: ACTIVE`}</p>
-                        <p>{`> TRACE: 0x${Math.random().toString(16).slice(2, 10).toUpperCase()}`}</p>
+                        <p suppressHydrationWarning>{trace ? `> TRACE: ${trace}` : '> TRACE: —'}</p>
                         <p className="text-[#1ae0b5]/40">{`> ANALYZING_RESOURCES: OK`}</p>
                     </div>
                 </div>

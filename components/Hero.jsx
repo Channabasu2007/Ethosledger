@@ -55,7 +55,7 @@ export default function Hero() {
                             />
                             {/* FAB Submit Button */}
                             <div className="pr-2">
-                                <button className="flex items-center justify-center w-16 h-16 bg-primary rounded-full text-surface hover:bg-white transition-all shadow-[0_0_20px_rgba(26,224,181,0.4)] hover:shadow-[0_0_30px_rgba(26,224,181,0.6)] transform active:scale-95 cursor-pointer" type="submit">
+                                <button suppressHydrationWarning={true} className="flex items-center justify-center w-16 h-16 bg-primary rounded-full text-surface hover:bg-white transition-all shadow-[0_0_20px_rgba(26,224,181,0.4)] hover:shadow-[0_0_30px_rgba(26,224,181,0.6)] transform active:scale-95 cursor-pointer" type="submit">
                                     <span className="material-symbols-outlined text-3xl font-bold">bolt</span>
                                 </button>
                             </div>

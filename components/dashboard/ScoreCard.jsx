@@ -1,5 +1,7 @@
-export default function ScoreCard({ score = 34, co2 = "1.8" }) {
-    const isFailing = score < 50;
+export default function ScoreCard({ score = null, co2 = "—" }) {
+    const numericScore = typeof score === 'number' ? score : (score ? Number(score) : null);
+    const displayScore = numericScore !== null && !Number.isNaN(numericScore) ? Math.round(numericScore) : '—';
+    const isFailing = typeof displayScore === 'number' ? displayScore < 50 : false;
     
     return (
         <div className="col-span-1 md:col-span-2 row-span-2 relative overflow-hidden rounded-[28px] bg-surface-dark outline outline-1 outline-white/5">
@@ -15,11 +17,11 @@ export default function ScoreCard({ score = 34, co2 = "1.8" }) {
                 </div>
                 <div className="flex flex-col items-center justify-center py-8">
                     <h1 className="text-[140px] leading-[0.8] font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-500">
-                        {score}
+                        {displayScore}
                     </h1>
                 </div>
                 <div className="text-sm text-gray-400 max-w-[250px]">
-                    Your site produces <strong className="text-white">{co2}g</strong> of CO2 per visit. 
+                    Your site produces <strong className="text-white">{co2}{typeof co2 === 'string' && !co2.endsWith('g') ? 'g' : ''}</strong> of CO2 per visit. 
                     This represents the direct carbon impact of the site's data transfer.
                 </div>
             </div>
