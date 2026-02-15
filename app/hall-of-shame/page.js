@@ -6,7 +6,14 @@ import Site from '../../lib/models/Site';
 async function getSites() {
   try {
     await connect();
-    const sites = await Site.find({}).sort({ rank: 1, score: -1 }).limit(100).lean();
+    // FIXED: Sort by LOWEST sustainability score (worst offenders first)
+    const sites = await Site.find({})
+      .sort({ 
+        'scores.sustainability': 1,  // Ascending (lowest/worst first)
+        'metrics.co2': -1              // Descending (highest CO2 first)
+      })
+      .limit(100)
+      .lean();
     return sites;
   } catch (err) {
     console.error('Failed to load sites:', err?.message || err);
@@ -73,10 +80,24 @@ export default async function HallOfShamePage() {
 
                     {sites.map((site, idx) => {
                         const metrics = site.metrics || {};
+                        const scores = site.scores || {};
+                        
+                        // FIXED: Use sustainability score (lower = worse)
+                        const sustainabilityScore = scores.sustainability ?? 0;
+                        const co2 = metrics.co2 || '—';
                         const weight = metrics.totalWeight || '—';
                         const loadTime = metrics.loadTime || '—';
-                        const score = site.score ?? '—';
-                        const rank = site.rank ?? idx + 1;
+                        const rank = idx + 1; // Rank by position in sorted list
+                        
+                        // Determine shame level
+                        const getShameLevel = (score) => {
+                            if (score >= 80) return { label: 'Minor Offender', color: 'yellow' };
+                            if (score >= 60) return { label: 'Moderate Waste', color: 'orange' };
+                            if (score >= 40) return { label: 'Heavy Polluter', color: 'red' };
+                            return { label: 'Digital Disaster', color: 'red' };
+                        };
+                        
+                        const shameLevel = getShameLevel(sustainabilityScore);
 
                         return (
                             <div key={site._id || site.url} className="masonry-item card-hover relative group flex flex-col bg-surface-container-low rounded-3xl overflow-hidden border border-white/5">
@@ -90,37 +111,70 @@ export default async function HallOfShamePage() {
                                     <div className="absolute top-4 right-4 z-20 bg-surface-container text-on-surface font-bold px-4 py-2 rounded-full border border-white/10 flex items-center gap-1">
                                         <span className="text-orange-400">#{rank}</span>
                                     </div>
+                                    {/* Shame Badge */}
+                                    <div className={`absolute top-4 left-4 z-20 px-3 py-1 rounded-full border text-xs font-bold uppercase tracking-wider ${
+                                        shameLevel.color === 'red' ? 'bg-red-900/50 border-red-500/50 text-red-200' :
+                                        shameLevel.color === 'orange' ? 'bg-orange-900/50 border-orange-500/50 text-orange-200' :
+                                        'bg-yellow-900/50 border-yellow-500/50 text-yellow-200'
+                                    }`}>
+                                        {shameLevel.label}
+                                    </div>
                                 </div>
 
                                 <div className="p-6 pt-2 flex flex-col gap-6 relative z-20">
                                     <div>
                                         <div className="flex items-baseline justify-between mb-1">
-                                            <h3 className="text-2xl font-bold text-on-surface leading-tight break-words">{site.title || site.url}</h3>
+                                            <h3 className="text-2xl font-bold text-on-surface leading-tight break-words">{site.title || site.host || site.url}</h3>
                                             <span className="text-xs font-mono text-on-surface-variant bg-surface-container px-2 py-1 rounded">{site.category || 'SITE'}</span>
                                         </div>
-                                        <Link className="text-primary hover:underline text-sm opacity-80 decoration-primary/50" href={site.url || '#'}>View detailed audit →</Link>
+                                        <Link className="text-primary hover:underline text-sm opacity-80 decoration-primary/50" href={`/audit?url=${encodeURIComponent(site.url)}`}>View detailed audit →</Link>
                                     </div>
 
                                     <div className="space-y-2">
                                         <div className="flex justify-between items-end">
-                                            <span className="text-sm font-medium text-on-surface-variant">Digital Rot Score</span>
-                                            <span className="text-2xl font-black text-red-400">{score}<span className="text-sm font-normal text-on-surface-variant ml-1">/ 100</span></span>
+                                            <span className="text-sm font-medium text-on-surface-variant">Sustainability Score</span>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className={`text-2xl font-black ${
+                                                    sustainabilityScore >= 80 ? 'text-yellow-400' :
+                                                    sustainabilityScore >= 60 ? 'text-orange-400' :
+                                                    'text-red-400'
+                                                }`}>
+                                                    {sustainabilityScore}
+                                                </span>
+                                                <span className="text-sm font-normal text-on-surface-variant">/ 100</span>
+                                            </div>
                                         </div>
+                                        {/* FIXED: Progress bar - Lower score = fuller bar (worse) */}
                                         <div className="h-4 w-full bg-surface-container-high rounded-full overflow-hidden p-1">
-                                            <div className="h-full bg-gradient-to-r from-orange-500 to-red-500 rounded-full" style={{ width: `${Math.min(100, score || 0)}%` }}></div>
+                                            <div 
+                                                className={`h-full rounded-full ${
+                                                    sustainabilityScore >= 80 ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
+                                                    sustainabilityScore >= 60 ? 'bg-gradient-to-r from-orange-500 to-orange-600' :
+                                                    'bg-gradient-to-r from-red-500 to-red-600'
+                                                }`}
+                                                style={{ width: `${100 - sustainabilityScore}%` }}
+                                            ></div>
                                         </div>
+                                        <p className="text-xs text-on-surface-variant italic">
+                                            Lower is worse — this site scored in the bottom {100 - sustainabilityScore}%
+                                        </p>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-3 gap-3">
                                         <div className="bg-surface-container p-4 rounded-2xl flex flex-col gap-1">
                                             <span className="material-symbols-outlined text-on-surface-variant !text-xl mb-1">co2</span>
-                                            <span className="text-2xl font-bold text-on-surface">{metrics.co2 ?? '—'}</span>
-                                            <span className="text-xs text-on-surface-variant">CO₂ per visit</span>
+                                            <span className="text-xl font-bold text-on-surface">{co2}g</span>
+                                            <span className="text-xs text-on-surface-variant">CO₂/visit</span>
                                         </div>
                                         <div className="bg-surface-container p-4 rounded-2xl flex flex-col gap-1">
                                             <span className="material-symbols-outlined text-on-surface-variant !text-xl mb-1">data_usage</span>
-                                            <span className="text-2xl font-bold text-on-surface">{weight}</span>
-                                            <span className="text-xs text-on-surface-variant">Page weight</span>
+                                            <span className="text-xl font-bold text-on-surface">{weight}MB</span>
+                                            <span className="text-xs text-on-surface-variant">Weight</span>
+                                        </div>
+                                        <div className="bg-surface-container p-4 rounded-2xl flex flex-col gap-1">
+                                            <span className="material-symbols-outlined text-on-surface-variant !text-xl mb-1">speed</span>
+                                            <span className="text-xl font-bold text-on-surface">{loadTime}s</span>
+                                            <span className="text-xs text-on-surface-variant">Load</span>
                                         </div>
                                     </div>
                                 </div>
@@ -131,10 +185,10 @@ export default async function HallOfShamePage() {
             </main>
 
             <div className="fixed bottom-8 right-8 z-50">
-                <button className="flex items-center gap-3 bg-primary text-on-primary pl-4 pr-6 h-14 rounded-full shadow-[0_8px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_12px_20px_rgba(0,0,0,0.4)] hover:scale-105 transition-all font-bold text-lg group cursor-pointer">
+                <Link href={"/"} className="flex items-center gap-3 bg-primary text-on-primary pl-4 pr-6 h-14 rounded-full shadow-[0_8px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_12px_20px_rgba(0,0,0,0.4)] hover:scale-105 transition-all font-bold text-lg group cursor-pointer">
                     <span className="material-symbols-outlined !text-[28px]">add_link</span>
                     Audit a Site
-                </button>
+                </Link>
             </div>
         </div>
     );

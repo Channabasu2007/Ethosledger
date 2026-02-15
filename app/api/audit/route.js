@@ -15,7 +15,7 @@ export async function GET(request) {
   try {
     browser = await puppeteer.launch({
       headless: "new",
-      executablePath: "C:\\Users\\tusha.TUSHAR\\.cache\\puppeteer\\chrome\\win64-145.0.7632.67\\chrome-win64\\chrome.exe",
+      executablePath: "C:\\Users\\Lenovo\\.cache\\puppeteer\\chrome\\win64-145.0.7632.76\\chrome-win64\\chrome.exe",
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
     });
 
@@ -23,24 +23,22 @@ export async function GET(request) {
     const client = await page.target().createCDPSession();
     await client.send("Performance.enable");
 
-    // --- FIXED: Only count actual API calls (XHR/Fetch) ---
     await page.setRequestInterception(true);
     let totalBytes = 0;
     let apiCallsCount = 0;
     const detectedTrackers = new Map();
-    const trackerKeywords = ["analytics", "pixel", "ads", "tracker", "doubleclick", "facebook", "connect", "tiktok"];
+    
+    const trackerKeywords = [
+      "analytics", "pixel", "ads", "tracker", "doubleclick", 
+      "facebook", "connect", "tiktok", "gtag", "gtm", 
+      "googletagmanager", "google-analytics", "gstatic"
+    ];
 
     page.on("request", (req) => {
       const resourceType = req.resourceType();
-      
-      // Only count XHR and Fetch requests (actual API calls)
-      if (resourceType === 'xhr' || resourceType === 'fetch') {
-        apiCallsCount++;
-      }
-      
       const reqUrl = req.url().toLowerCase();
+      
       const isTracker = trackerKeywords.some((k) => reqUrl.includes(k));
-
       if (isTracker) {
         try {
           const host = new URL(reqUrl).hostname;
@@ -49,6 +47,11 @@ export async function GET(request) {
           }
         } catch (e) {}
       }
+      
+      if ((resourceType === 'xhr' || resourceType === 'fetch') && !isTracker) {
+        apiCallsCount++;
+      }
+      
       req.continue();
     });
 
@@ -59,7 +62,6 @@ export async function GET(request) {
       } catch (e) {}
     });
 
-    // --- FIXED: Accurate load time measurement ---
     const navigationStart = Date.now();
     
     await page.goto(targetUrl, { 
@@ -85,41 +87,28 @@ export async function GET(request) {
 
     // --- SEO ANALYSIS ---
     const seoData = await page.evaluate(() => {
-      // Title
       const title = document.querySelector('title')?.innerText || '';
-      
-      // Meta Description
       const metaDesc = document.querySelector('meta[name="description"]')?.content || '';
-      
-      // Meta Keywords
       const metaKeywords = document.querySelector('meta[name="keywords"]')?.content || '';
       
-      // Open Graph tags
       const ogTitle = document.querySelector('meta[property="og:title"]')?.content || '';
       const ogDesc = document.querySelector('meta[property="og:description"]')?.content || '';
       const ogImage = document.querySelector('meta[property="og:image"]')?.content || '';
       
-      // Twitter Card tags
       const twitterCard = document.querySelector('meta[name="twitter:card"]')?.content || '';
       const twitterTitle = document.querySelector('meta[name="twitter:title"]')?.content || '';
       
-      // Canonical URL
       const canonical = document.querySelector('link[rel="canonical"]')?.href || '';
-      
-      // Robots meta tag
       const robots = document.querySelector('meta[name="robots"]')?.content || '';
       
-      // Headings structure
       const h1Count = document.querySelectorAll('h1').length;
       const h2Count = document.querySelectorAll('h2').length;
       const h1Text = Array.from(document.querySelectorAll('h1')).map(h => h.innerText.trim()).filter(Boolean);
       
-      // Images without alt text
       const images = document.querySelectorAll('img');
       const totalImages = images.length;
       const imagesWithoutAlt = Array.from(images).filter(img => !img.alt || img.alt.trim() === '').length;
       
-      // Links
       const allLinks = document.querySelectorAll('a');
       const totalLinks = allLinks.length;
       const internalLinks = Array.from(allLinks).filter(a => {
@@ -130,7 +119,6 @@ export async function GET(request) {
       const externalLinks = totalLinks - internalLinks;
       const brokenLinks = Array.from(allLinks).filter(a => !a.href || a.href === '#' || a.href === 'javascript:void(0)').length;
       
-      // Structured Data (JSON-LD)
       const structuredData = Array.from(document.querySelectorAll('script[type="application/ld+json"]'))
         .map(script => {
           try {
@@ -141,108 +129,51 @@ export async function GET(request) {
         })
         .filter(Boolean);
       
-      // Language attribute
       const lang = document.documentElement.lang || '';
-      
-      // Viewport meta tag (mobile-friendly)
       const viewport = document.querySelector('meta[name="viewport"]')?.content || '';
       
-      // Word count (content length indicator)
       const bodyText = document.body.innerText || '';
       const wordCount = bodyText.trim().split(/\s+/).filter(word => word.length > 0).length;
       
-      // Favicon
       const favicon = document.querySelector('link[rel="icon"]') || document.querySelector('link[rel="shortcut icon"]');
-      
-      // HTTPS check
       const isHttps = window.location.protocol === 'https:';
       
       return {
-        title: {
-          content: title,
-          length: title.length,
-          exists: title.length > 0
-        },
-        metaDescription: {
-          content: metaDesc,
-          length: metaDesc.length,
-          exists: metaDesc.length > 0
-        },
-        metaKeywords: {
-          content: metaKeywords,
-          exists: metaKeywords.length > 0
-        },
+        title: { content: title, length: title.length, exists: title.length > 0 },
+        metaDescription: { content: metaDesc, length: metaDesc.length, exists: metaDesc.length > 0 },
+        metaKeywords: { content: metaKeywords, exists: metaKeywords.length > 0 },
         openGraph: {
-          title: ogTitle,
-          description: ogDesc,
-          image: ogImage,
+          title: ogTitle, description: ogDesc, image: ogImage,
           exists: !!(ogTitle || ogDesc || ogImage),
           complete: !!(ogTitle && ogDesc && ogImage)
         },
-        twitter: {
-          card: twitterCard,
-          title: twitterTitle,
-          exists: !!(twitterCard || twitterTitle)
-        },
-        canonical: {
-          url: canonical,
-          exists: canonical.length > 0
-        },
-        robots: {
-          content: robots,
-          exists: robots.length > 0
-        },
-        headings: {
-          h1Count,
-          h2Count,
-          h1Text,
-          multipleH1: h1Count > 1,
-          noH1: h1Count === 0
-        },
+        twitter: { card: twitterCard, title: twitterTitle, exists: !!(twitterCard || twitterTitle) },
+        canonical: { url: canonical, exists: canonical.length > 0 },
+        robots: { content: robots, exists: robots.length > 0 },
+        headings: { h1Count, h2Count, h1Text, multipleH1: h1Count > 1, noH1: h1Count === 0 },
         images: {
-          total: totalImages,
-          withoutAlt: imagesWithoutAlt,
-          withAlt: totalImages - imagesWithoutAlt,
+          total: totalImages, withoutAlt: imagesWithoutAlt, withAlt: totalImages - imagesWithoutAlt,
           altCoverage: totalImages > 0 ? ((totalImages - imagesWithoutAlt) / totalImages * 100).toFixed(1) : 100
         },
-        links: {
-          total: totalLinks,
-          internal: internalLinks,
-          external: externalLinks,
-          broken: brokenLinks
-        },
+        links: { total: totalLinks, internal: internalLinks, external: externalLinks, broken: brokenLinks },
         structuredData: {
           exists: structuredData.length > 0,
           count: structuredData.length,
           types: structuredData.map(d => d['@type']).filter(Boolean)
         },
-        language: {
-          code: lang,
-          exists: lang.length > 0
-        },
-        viewport: {
-          content: viewport,
-          exists: viewport.length > 0,
-          isMobileFriendly: viewport.includes('width=device-width')
-        },
-        content: {
-          wordCount
-        },
-        favicon: {
-          exists: !!favicon
-        },
-        security: {
-          isHttps
-        }
+        language: { code: lang, exists: lang.length > 0 },
+        viewport: { content: viewport, exists: viewport.length > 0, isMobileFriendly: viewport.includes('width=device-width') },
+        content: { wordCount },
+        favicon: { exists: !!favicon },
+        security: { isHttps }
       };
     });
 
-    // Calculate SEO Score (0-100)
+    // Calculate SEO Score
     let seoScore = 0;
     const issues = [];
     const suggestions = [];
 
-    // Title (10 points)
     if (seoData.title.exists && seoData.title.length >= 30 && seoData.title.length <= 60) {
       seoScore += 10;
     } else if (!seoData.title.exists) {
@@ -258,7 +189,6 @@ export async function GET(request) {
       seoScore += 5;
     }
 
-    // Meta Description (10 points)
     if (seoData.metaDescription.exists && seoData.metaDescription.length >= 120 && seoData.metaDescription.length <= 160) {
       seoScore += 10;
     } else if (!seoData.metaDescription.exists) {
@@ -274,7 +204,6 @@ export async function GET(request) {
       seoScore += 5;
     }
 
-    // H1 Tags (10 points)
     if (seoData.headings.h1Count === 1) {
       seoScore += 10;
     } else if (seoData.headings.noH1) {
@@ -286,10 +215,9 @@ export async function GET(request) {
       seoScore += 5;
     }
 
-    // Images Alt Text (10 points)
     const altCoverage = parseFloat(seoData.images.altCoverage);
     if (seoData.images.total === 0) {
-      seoScore += 10; // No images, so no issues
+      seoScore += 10;
     } else if (altCoverage === 100) {
       seoScore += 10;
     } else if (altCoverage >= 80) {
@@ -306,15 +234,9 @@ export async function GET(request) {
       seoScore += 2;
     }
 
-    // Canonical URL (5 points)
-    if (seoData.canonical.exists) {
-      seoScore += 5;
-    } else {
-      issues.push("Missing canonical URL");
-      suggestions.push("Add a canonical link tag to prevent duplicate content issues");
-    }
+    if (seoData.canonical.exists) seoScore += 5;
+    else { issues.push("Missing canonical URL"); suggestions.push("Add a canonical link tag to prevent duplicate content issues"); }
 
-    // Open Graph (10 points)
     if (seoData.openGraph.complete) {
       seoScore += 10;
     } else if (seoData.openGraph.exists) {
@@ -326,7 +248,6 @@ export async function GET(request) {
       suggestions.push("Add Open Graph tags for better social media sharing");
     }
 
-    // Mobile Friendly (10 points)
     if (seoData.viewport.isMobileFriendly) {
       seoScore += 10;
     } else if (seoData.viewport.exists) {
@@ -338,23 +259,12 @@ export async function GET(request) {
       suggestions.push("Add viewport meta tag for mobile responsiveness");
     }
 
-    // Structured Data (10 points)
-    if (seoData.structuredData.exists) {
-      seoScore += 10;
-    } else {
-      issues.push("No structured data found");
-      suggestions.push("Add schema.org structured data (JSON-LD) for rich snippets");
-    }
+    if (seoData.structuredData.exists) seoScore += 10;
+    else { issues.push("No structured data found"); suggestions.push("Add schema.org structured data (JSON-LD) for rich snippets"); }
 
-    // Language (5 points)
-    if (seoData.language.exists) {
-      seoScore += 5;
-    } else {
-      issues.push("Missing language attribute");
-      suggestions.push("Add lang attribute to <html> tag (e.g., <html lang='en'>)");
-    }
+    if (seoData.language.exists) seoScore += 5;
+    else { issues.push("Missing language attribute"); suggestions.push("Add lang attribute to <html> tag (e.g., <html lang='en'>)"); }
 
-    // Content Length (10 points)
     if (seoData.content.wordCount >= 300) {
       seoScore += 10;
     } else if (seoData.content.wordCount >= 150) {
@@ -366,7 +276,6 @@ export async function GET(request) {
       suggestions.push("Add substantial content (aim for 300+ words)");
     }
 
-    // Links (5 points)
     if (seoData.links.broken === 0 && seoData.links.internal >= 3) {
       seoScore += 5;
     } else if (seoData.links.broken > 0) {
@@ -379,85 +288,60 @@ export async function GET(request) {
       seoScore += 3;
     }
 
-    // HTTPS (5 points)
-    if (seoData.security.isHttps) {
-      seoScore += 5;
-    } else {
-      issues.push("Site not using HTTPS");
-      suggestions.push("Enable HTTPS for security and SEO benefits");
-    }
+    if (seoData.security.isHttps) seoScore += 5;
+    else { issues.push("Site not using HTTPS"); suggestions.push("Enable HTTPS for security and SEO benefits"); }
 
-    // Favicon (5 points)
-    if (seoData.favicon.exists) {
-      seoScore += 5;
-    } else {
-      issues.push("Missing favicon");
-      suggestions.push("Add a favicon for better branding");
-    }
+    if (seoData.favicon.exists) seoScore += 5;
+    else { issues.push("Missing favicon"); suggestions.push("Add a favicon for better branding"); }
 
-    // Determine grade
     let grade = 'F';
     if (seoScore >= 90) grade = 'A';
     else if (seoScore >= 80) grade = 'B';
     else if (seoScore >= 70) grade = 'C';
     else if (seoScore >= 60) grade = 'D';
 
-    // Capture CPU metrics
-    await new Promise((r) => setTimeout(r, 2000));
+    // --- CPU METRICS ---
+    await new Promise((r) => setTimeout(r, 3000));
+    
     const { metrics } = await client.send("Performance.getMetrics");
     const cpuTaskDuration = metrics.find((m) => m.name === "TaskDuration")?.value * 1000 || 0;
-    const cpuPercent = Math.min(100, (cpuTaskDuration / 3000) * 100).toFixed(1);
+    const cpuPercent = Math.min(100, (cpuTaskDuration / 10000) * 100).toFixed(1);
 
-    // --- FINAL CALCULATION ---
+    // --- FIXED CO2 CALCULATION ---
     const mb = totalBytes / (1024 * 1024);
-    const co2Emissions = new co2({ model: "swd" }).perByte(totalBytes);
+    
+    // Use the @tgwf/co2 library for accurate calculation
+    const co2Instance = new co2({ model: "swd" });
+    const co2Grams = co2Instance.perByte(totalBytes);
 
-    // --- SUSTAINABILITY: compute CO2 per visit using simplified OneByte/SWD model ---
-    // Constants (industry averages)
-    const ENERGY_PER_GB = 0.81; // kWh per GB
-    const CARBON_INTENSITY = 442; // g CO2 per kWh (global average)
+    // Calculate sustainability score based on actual CO2
+    let sustainabilityScore;
+    if (co2Grams <= 0.5) {
+      sustainabilityScore = 100; // Excellent
+    } else if (co2Grams <= 1.0) {
+      sustainabilityScore = Math.round(100 - ((co2Grams - 0.5) / 0.5) * 20); // 100-80
+    } else if (co2Grams <= 2.0) {
+      sustainabilityScore = Math.round(80 - ((co2Grams - 1.0) / 1.0) * 30); // 80-50
+    } else if (co2Grams <= 5.0) {
+      sustainabilityScore = Math.round(50 - ((co2Grams - 2.0) / 3.0) * 40); // 50-10
+    } else {
+      sustainabilityScore = Math.max(0, Math.round(10 - ((co2Grams - 5.0) / 5.0) * 10)); // 10-0
+    }
 
-    // Convert MB -> GB (use decimal MB -> GB to match WebsiteCarbon examples)
-    const gb = mb / 1000; // 2.29 MB => 0.00229 GB
-
-    // Base energy and CO2 (data transfer only)
-    const baseEnergyKwh = gb * ENERGY_PER_GB;
-    const baseCo2Grams = baseEnergyKwh * CARBON_INTENSITY;
-
-    // Parse CPU percent (could be string) and clamp
-    const cpuPct = parseFloat(cpuPercent) || 0;
-    const cpuFactor = Math.min(Math.max(cpuPct, 0), 100) / 100;
-
-    // Simple overhead models (tunable): CPU contributes up to 10% extra at 100% CPU
-    const cpuOverheadGrams = baseCo2Grams * cpuFactor * 0.10;
-    // Each API call adds a small extra (network + backend); assume 0.01 g per call
-    const apiOverheadGrams = apiCallsCount * 0.01;
-    // Trackers add overhead (scripts, extra requests); assume 0.02 g per tracker host
-    const trackerOverheadGrams = (detectedTrackers.size || 0) * 0.02;
-
-    const computedCo2PerView = baseCo2Grams + cpuOverheadGrams + apiOverheadGrams + trackerOverheadGrams;
-
-    // Derive a sustainability score (0 = worst, 100 = best) using an inverse mapping
-    const capped = Math.min(computedCo2PerView, 200); // clamp extreme values
-    const computedScore = Math.round(100 * (1 - capped / 200));
-
-    // Build sustainability object (includes breakdown and source)
+    // Detailed breakdown for transparency
     const sustainability = {
-      source: 'computed',
-      method: 'onebyte_swd_simplified',
-      gb: Number(gb.toFixed(6)),
-      baseCo2Grams: Number(baseCo2Grams.toFixed(6)),
-      cpuOverheadGrams: Number(cpuOverheadGrams.toFixed(6)),
-      apiOverheadGrams: Number(apiOverheadGrams.toFixed(6)),
-      trackerOverheadGrams: Number(trackerOverheadGrams.toFixed(6)),
-      co2PerView: Number(computedCo2PerView.toFixed(6)),
-      score: computedScore,
+      source: 'tgwf_co2_library',
+      model: 'swd',
+      totalBytes: totalBytes,
+      megabytes: Number(mb.toFixed(2)),
+      co2Grams: Number(co2Grams.toFixed(3)),
+      score: sustainabilityScore,
+      // Additional context
+      trackerPenalty: detectedTrackers.size * 0.02,
+      apiCallPenalty: apiCallsCount * 0.01,
     };
 
-    // Derive a numeric sustainability score (0-100). If WebsiteCarbon provided a score, use it; otherwise map per-byte CO2.
-    const sustainabilityScore = sustainability.score ?? Math.round(100 * (1 - Math.min(parseFloat(co2Emissions.toFixed(3)) || 0, 200) / 200));
-
-    // Save audit result to DB (best-effort, don't fail audit on DB error)
+    // Save to DB
     try {
       await connect();
       const host = new URL(targetUrl).hostname;
@@ -467,11 +351,12 @@ export async function GET(request) {
         title: seoData?.title?.content || '',
         score: Math.min(100, seoScore),
         scores: {
-          sustainability: sustainabilityScore
+          sustainability: sustainabilityScore,
+          seo: Math.min(100, seoScore)
         },
         metrics: {
           totalWeight: mb.toFixed(2),
-          co2: co2Emissions.toFixed(3),
+          co2: co2Grams.toFixed(3),
           loadTime: finalLoadTime,
           trackerCount: detectedTrackers.size,
           apiCalls: apiCallsCount,
@@ -495,7 +380,7 @@ export async function GET(request) {
       url: targetUrl,
       metrics: {
         totalWeight: mb.toFixed(2),
-        co2: co2Emissions.toFixed(3),
+        co2: co2Grams.toFixed(3),
         loadTime: finalLoadTime,
         trackerCount: detectedTrackers.size,
         apiCalls: apiCallsCount,
@@ -503,7 +388,8 @@ export async function GET(request) {
         sustainability,
       },
       scores: {
-        sustainability: sustainabilityScore
+        sustainability: sustainabilityScore,
+        seo: Math.min(100, seoScore)
       },
       seo: {
         score: Math.min(100, seoScore),
