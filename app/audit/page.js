@@ -307,7 +307,147 @@ function AuditContent() {
                         </div>
                     </div>
                 )}
+                {/* Security Analysis Section */}
+{auditData?.security && (
+    <div className="mt-8 animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
+        <div className="bg-surface-dark border border-white/5 rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-6">
+                <span className="material-symbols-outlined text-3xl text-red-400">shield</span>
+                <div>
+                    <h2 className="text-2xl font-bold">Security & Code Analysis</h2>
+                    <p className="text-sm text-gray-400">Dangerous Code Detection Report</p>
+                </div>
+                <div className="ml-auto flex items-center gap-3">
+                    <div className="text-right">
+                        <div className={`text-4xl font-bold ${
+                            auditData.security.score >= 80 ? 'text-green-400' :
+                            auditData.security.score >= 60 ? 'text-yellow-400' :
+                            'text-red-400'
+                        }`}>
+                            {auditData.security.score}
+                        </div>
+                        <div className="text-xs text-gray-400 uppercase tracking-wider">
+                            Grade: {auditData.security.grade}
+                        </div>
+                    </div>
+                </div>
             </div>
+
+            {/* Severity Summary */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-red-400">{auditData.security.critical}</div>
+                    <div className="text-xs text-red-300 uppercase tracking-wider">Critical</div>
+                </div>
+                <div className="bg-orange-900/20 border border-orange-500/30 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-orange-400">{auditData.security.high}</div>
+                    <div className="text-xs text-orange-300 uppercase tracking-wider">High</div>
+                </div>
+                <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-yellow-400">{auditData.security.medium}</div>
+                    <div className="text-xs text-yellow-300 uppercase tracking-wider">Medium</div>
+                </div>
+                <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-blue-400">{auditData.security.low}</div>
+                    <div className="text-xs text-blue-300 uppercase tracking-wider">Low</div>
+                </div>
+            </div>
+
+            {/* Dangers List */}
+            {auditData.security.dangers && auditData.security.dangers.length > 0 && (
+                <div className="mb-6">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-red-400 mb-3 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-lg">warning</span>
+                        Security Issues Found ({auditData.security.totalDangers})
+                    </h3>
+                    <div className="space-y-3">
+                        {auditData.security.dangers.map((danger, idx) => (
+                            <div 
+                                key={idx} 
+                                className={`rounded-lg p-4 border ${
+                                    danger.severity === 'critical' ? 'bg-red-500/10 border-red-500/30' :
+                                    danger.severity === 'high' ? 'bg-orange-500/10 border-orange-500/30' :
+                                    danger.severity === 'medium' ? 'bg-yellow-500/10 border-yellow-500/30' :
+                                    'bg-blue-500/10 border-blue-500/30'
+                                }`}
+                            >
+                                <div className="flex items-start gap-3">
+                                    <span className={`material-symbols-outlined text-2xl ${
+                                        danger.severity === 'critical' ? 'text-red-400' :
+                                        danger.severity === 'high' ? 'text-orange-400' :
+                                        danger.severity === 'medium' ? 'text-yellow-400' :
+                                        'text-blue-400'
+                                    }`}>
+                                        {danger.type === 'security' ? 'security' :
+                                         danger.type === 'privacy' ? 'visibility_off' :
+                                         danger.type === 'malicious' ? 'virus' :
+                                         'code'}
+                                    </span>
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${
+                                                danger.severity === 'critical' ? 'bg-red-500/20 text-red-300' :
+                                                danger.severity === 'high' ? 'bg-orange-500/20 text-orange-300' :
+                                                danger.severity === 'medium' ? 'bg-yellow-500/20 text-yellow-300' :
+                                                'bg-blue-500/20 text-blue-300'
+                                            }`}>
+                                                {danger.severity}
+                                            </span>
+                                            <span className="text-xs text-gray-500 uppercase">{danger.type}</span>
+                                        </div>
+                                        <h4 className="font-bold text-white mb-1">{danger.issue}</h4>
+                                        <p className="text-sm text-gray-400 mb-2">{danger.description}</p>
+                                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                                            <span className="material-symbols-outlined text-sm text-primary">lightbulb</span>
+                                            <span>{danger.recommendation}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* No Issues */}
+            {auditData.security.totalDangers === 0 && (
+                <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-6 text-center">
+                    <span className="material-symbols-outlined text-5xl text-green-400 mb-2">verified</span>
+                    <h3 className="text-xl font-bold text-green-400 mb-2">No Security Issues Detected</h3>
+                    <p className="text-sm text-gray-400">Your site appears to follow security best practices!</p>
+                </div>
+            )}
+
+            {/* Code Summary */}
+            {auditData.security.summary && (
+                <div className="mt-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                    <div className="bg-black/40 rounded-lg p-3 border border-white/5">
+                        <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Inline Scripts</div>
+                        <div className="text-xl font-bold text-white">{auditData.security.summary.inlineScripts}</div>
+                    </div>
+                    <div className="bg-black/40 rounded-lg p-3 border border-white/5">
+                        <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">External Sources</div>
+                        <div className="text-xl font-bold text-white">{auditData.security.summary.externalScripts}</div>
+                    </div>
+                    <div className="bg-black/40 rounded-lg p-3 border border-white/5">
+                        <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">iFrames</div>
+                        <div className="text-xl font-bold text-white">{auditData.security.summary.iframes}</div>
+                    </div>
+                    <div className="bg-black/40 rounded-lg p-3 border border-white/5">
+                        <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">CSP</div>
+                        <div className="text-xl font-bold">{auditData.security.summary.hasCSP ? '✓' : '✗'}</div>
+                    </div>
+                    <div className="bg-black/40 rounded-lg p-3 border border-white/5">
+                        <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Obfuscation</div>
+                        <div className="text-xl font-bold">{auditData.security.summary.hasObfuscation ? '⚠️' : '✓'}</div>
+                    </div>
+                </div>
+            )}
+        </div>
+    </div>
+)}
+            </div>
+            
         </div>
     );
 }

@@ -307,14 +307,20 @@ export async function GET(request) {
     const cpuTaskDuration = metrics.find((m) => m.name === "TaskDuration")?.value * 1000 || 0;
     const cpuPercent = Math.min(100, (cpuTaskDuration / 10000) * 100).toFixed(1);
 
-    // --- FIXED CO2 CALCULATION ---
+    // --- FIXED: REALISTIC CO2 CALCULATION ---
     const mb = totalBytes / (1024 * 1024);
     
-    // Use the @tgwf/co2 library for accurate calculation
-    const co2Instance = new co2({ model: "swd" });
-    const co2Grams = co2Instance.perByte(totalBytes);
+    // Simple, realistic CO2 calculation (aligned with websitecarbon.com)
+    // Formula: Data (GB) × Energy per GB (kWh) × Carbon Intensity (g CO2/kWh)
+    const ENERGY_PER_GB = 0.81; // kWh per GB transferred
+    const CARBON_INTENSITY = 442; // g CO2 per kWh (global average)
+    const EFFICIENCY_FACTOR = 0.5; // Green hosting reduces this by ~50%
+    
+    const gb = mb / 1024; // Proper MB to GB conversion
+    const energyKwh = gb * ENERGY_PER_GB * EFFICIENCY_FACTOR;
+    const co2Grams = energyKwh * CARBON_INTENSITY;
 
-    // Calculate sustainability score based on actual CO2
+    // Calculate sustainability score based on CO2
     let sustainabilityScore;
     if (co2Grams <= 0.5) {
       sustainabilityScore = 100; // Excellent
@@ -328,17 +334,18 @@ export async function GET(request) {
       sustainabilityScore = Math.max(0, Math.round(10 - ((co2Grams - 5.0) / 5.0) * 10)); // 10-0
     }
 
-    // Detailed breakdown for transparency
+    // Detailed breakdown
     const sustainability = {
-      source: 'tgwf_co2_library',
-      model: 'swd',
+      source: 'custom_calculation',
+      model: 'simplified_swd',
       totalBytes: totalBytes,
       megabytes: Number(mb.toFixed(2)),
+      gigabytes: Number(gb.toFixed(6)),
+      energyKwh: Number(energyKwh.toFixed(6)),
       co2Grams: Number(co2Grams.toFixed(3)),
       score: sustainabilityScore,
-      // Additional context
-      trackerPenalty: detectedTrackers.size * 0.02,
-      apiCallPenalty: apiCallsCount * 0.01,
+      trackerCount: detectedTrackers.size,
+      apiCalls: apiCallsCount,
     };
 
     // Save to DB
@@ -375,35 +382,275 @@ export async function GET(request) {
     } catch (dbErr) {
       console.error('Failed to save audit result to DB:', dbErr?.message || dbErr);
     }
-
-    return NextResponse.json({
-      url: targetUrl,
-      metrics: {
-        totalWeight: mb.toFixed(2),
-        co2: co2Grams.toFixed(3),
-        loadTime: finalLoadTime,
-        trackerCount: detectedTrackers.size,
-        apiCalls: apiCallsCount,
-        cpuUsage: cpuPercent,
-        sustainability,
-      },
-      scores: {
-        sustainability: sustainabilityScore,
-        seo: Math.min(100, seoScore)
-      },
-      seo: {
-        score: Math.min(100, seoScore),
-        grade: grade,
-        issues: issues,
-        suggestions: suggestions,
-        details: seoData
-      },
-      killList: Array.from(detectedTrackers.values()),
-      timeline: [
-        { year: "2020", size: (mb * 0.45).toFixed(2) },
-        { year: "2026", size: mb.toFixed(2) },
-      ]
+const dangerousCodeData = await page.evaluate(() => {
+  const dangers = [];
+  
+  // 1. INLINE SCRIPTS (XSS Risk)
+  const inlineScripts = document.querySelectorAll('script:not([src])');
+  const inlineScriptCount = inlineScripts.length;
+  if (inlineScriptCount > 5) {
+    dangers.push({
+      type: 'security',
+      severity: 'high',
+      issue: `${inlineScriptCount} inline scripts detected`,
+      description: 'Inline scripts can be XSS vulnerabilities',
+      recommendation: 'Move JavaScript to external files with CSP'
     });
+  }
+  
+  // 2. EVAL() USAGE (Code Injection Risk)
+  const allScripts = Array.from(document.querySelectorAll('script'));
+  const hasEval = allScripts.some(script => {
+    const content = script.textContent || '';
+    return content.includes('eval(') || content.includes('Function(');
+  });
+  if (hasEval) {
+    dangers.push({
+      type: 'security',
+      severity: 'critical',
+      issue: 'eval() or Function() constructor detected',
+      description: 'Dynamic code execution is a major security risk',
+      recommendation: 'Remove eval() and use safer alternatives'
+    });
+  }
+  
+  // 3. DOCUMENT.WRITE (Performance & Security)
+  const hasDocumentWrite = allScripts.some(script => {
+    const content = script.textContent || '';
+    return content.includes('document.write');
+  });
+  if (hasDocumentWrite) {
+    dangers.push({
+      type: 'security',
+      severity: 'medium',
+      issue: 'document.write() detected',
+      description: 'Can block page rendering and enable XSS',
+      recommendation: 'Use modern DOM manipulation methods'
+    });
+  }
+  
+  // 4. UNSAFE IFRAMES
+  const iframes = document.querySelectorAll('iframe');
+  const unsafeIframes = Array.from(iframes).filter(iframe => {
+    return !iframe.hasAttribute('sandbox') || 
+           iframe.src.startsWith('javascript:');
+  });
+  if (unsafeIframes.length > 0) {
+    dangers.push({
+      type: 'security',
+      severity: 'high',
+      issue: `${unsafeIframes.length} unsafe iframe(s) without sandbox`,
+      description: 'Iframes without sandbox can execute arbitrary code',
+      recommendation: 'Add sandbox attribute to all iframes'
+    });
+  }
+  
+  // 5. CONSOLE LOGS (Info Leakage)
+  const hasConsoleLogs = allScripts.some(script => {
+    const content = script.textContent || '';
+    return content.match(/console\.(log|info|warn|error|debug)/);
+  });
+  if (hasConsoleLogs) {
+    dangers.push({
+      type: 'privacy',
+      severity: 'low',
+      issue: 'Console logging detected in production',
+      description: 'May leak sensitive information',
+      recommendation: 'Remove console statements in production builds'
+    });
+  }
+  
+  // 6. MIXED CONTENT (HTTP resources on HTTPS)
+  if (window.location.protocol === 'https:') {
+    const httpResources = Array.from(document.querySelectorAll('[src], [href]')).filter(el => {
+      const url = el.src || el.href;
+      return url && url.startsWith('http://');
+    });
+    if (httpResources.length > 0) {
+      dangers.push({
+        type: 'security',
+        severity: 'medium',
+        issue: `${httpResources.length} mixed content (HTTP on HTTPS)`,
+        description: 'Insecure resources compromise HTTPS protection',
+        recommendation: 'Upgrade all resources to HTTPS'
+      });
+    }
+  }
+  
+  // 7. EXTERNAL SCRIPTS (Supply Chain Risk)
+  const externalScripts = document.querySelectorAll('script[src]');
+  const externalScriptDomains = new Set();
+  Array.from(externalScripts).forEach(script => {
+    try {
+      const url = new URL(script.src);
+      if (url.hostname !== window.location.hostname) {
+        externalScriptDomains.add(url.hostname);
+      }
+    } catch (e) {}
+  });
+  
+  if (externalScriptDomains.size > 10) {
+    dangers.push({
+      type: 'security',
+      severity: 'medium',
+      issue: `${externalScriptDomains.size} external script sources`,
+      description: 'Each external script is a potential attack vector',
+      recommendation: 'Audit and minimize third-party scripts'
+    });
+  }
+  
+  // 8. NO CONTENT SECURITY POLICY
+  const hasCSP = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
+  if (!hasCSP) {
+    dangers.push({
+      type: 'security',
+      severity: 'high',
+      issue: 'No Content Security Policy detected',
+      description: 'CSP helps prevent XSS and injection attacks',
+      recommendation: 'Implement a strict Content Security Policy'
+    });
+  }
+  
+  // 9. OBFUSCATED CODE
+  const hasObfuscation = allScripts.some(script => {
+    const content = script.textContent || '';
+    // Check for common obfuscation patterns
+    const suspiciousPatterns = [
+      /\\x[0-9a-f]{2}/gi, // Hex encoding
+      /String\.fromCharCode/i,
+      /unescape\(/i,
+      /atob\(/i, // Base64 decode
+    ];
+    return suspiciousPatterns.some(pattern => pattern.test(content));
+  });
+  
+  if (hasObfuscation) {
+    dangers.push({
+      type: 'security',
+      severity: 'critical',
+      issue: 'Obfuscated/encoded code detected',
+      description: 'Code obfuscation often hides malicious behavior',
+      recommendation: 'Review and remove obfuscated code immediately'
+    });
+  }
+  
+  // 10. TRACKING PIXELS (Privacy)
+  const trackingPixels = Array.from(document.querySelectorAll('img')).filter(img => {
+    return img.width === 1 && img.height === 1;
+  });
+  if (trackingPixels.length > 0) {
+    dangers.push({
+      type: 'privacy',
+      severity: 'low',
+      issue: `${trackingPixels.length} tracking pixel(s) detected`,
+      description: 'Invisible trackers collecting user data',
+      recommendation: 'Disclose tracking in privacy policy'
+    });
+  }
+  
+  // 11. DEPRECATED APIS
+  const usesDeprecatedAPIs = allScripts.some(script => {
+    const content = script.textContent || '';
+    return content.includes('document.all') || 
+           content.includes('event.keyCode') ||
+           content.includes('navigator.userAgent');
+  });
+  if (usesDeprecatedAPIs) {
+    dangers.push({
+      type: 'code-quality',
+      severity: 'low',
+      issue: 'Deprecated APIs in use',
+      description: 'Old APIs may stop working in future browsers',
+      recommendation: 'Migrate to modern JavaScript APIs'
+    });
+  }
+  
+  // 12. CRYPTO MINING SCRIPTS
+  const cryptoMiningKeywords = ['coinhive', 'cryptonight', 'jsecoin', 'deepminer'];
+  const hasCryptoMining = allScripts.some(script => {
+    const src = (script.src || '').toLowerCase();
+    const content = (script.textContent || '').toLowerCase();
+    return cryptoMiningKeywords.some(keyword => 
+      src.includes(keyword) || content.includes(keyword)
+    );
+  });
+  if (hasCryptoMining) {
+    dangers.push({
+      type: 'malicious',
+      severity: 'critical',
+      issue: 'Cryptocurrency mining script detected',
+      description: 'Unauthorized use of visitor CPU resources',
+      recommendation: 'Remove crypto mining scripts immediately'
+    });
+  }
+  
+  return {
+    totalDangers: dangers.length,
+    critical: dangers.filter(d => d.severity === 'critical').length,
+    high: dangers.filter(d => d.severity === 'high').length,
+    medium: dangers.filter(d => d.severity === 'medium').length,
+    low: dangers.filter(d => d.severity === 'low').length,
+    dangers: dangers,
+    summary: {
+      inlineScripts: inlineScriptCount,
+      externalScripts: externalScriptDomains.size,
+      iframes: iframes.length,
+      hasCSP: !!hasCSP,
+      hasEval: hasEval,
+      hasObfuscation: hasObfuscation,
+    }
+  };
+});
+
+// Calculate danger score (0-100, higher is better/safer)
+const dangerScore = Math.max(0, 100 - (
+  (dangerousCodeData.critical * 25) + 
+  (dangerousCodeData.high * 10) + 
+  (dangerousCodeData.medium * 5) + 
+  (dangerousCodeData.low * 2)
+));
+   return NextResponse.json({
+  url: targetUrl,
+  metrics: {
+    totalWeight: mb.toFixed(2),
+    co2: co2Grams.toFixed(3),
+    loadTime: finalLoadTime,
+    trackerCount: detectedTrackers.size,
+    apiCalls: apiCallsCount,
+    cpuUsage: cpuPercent,
+    sustainability,
+  },
+  scores: {
+    sustainability: sustainabilityScore,
+    seo: Math.min(100, seoScore),
+    security: dangerScore  // ADD THIS
+  },
+  seo: {
+    score: Math.min(100, seoScore),
+    grade: grade,
+    issues: issues,
+    suggestions: suggestions,
+    details: seoData
+  },
+  // ADD THIS SECTION
+  security: {
+    score: dangerScore,
+    grade: dangerScore >= 90 ? 'A' : dangerScore >= 80 ? 'B' : dangerScore >= 70 ? 'C' : dangerScore >= 60 ? 'D' : 'F',
+    totalDangers: dangerousCodeData.totalDangers,
+    critical: dangerousCodeData.critical,
+    high: dangerousCodeData.high,
+    medium: dangerousCodeData.medium,
+    low: dangerousCodeData.low,
+    dangers: dangerousCodeData.dangers,
+    summary: dangerousCodeData.summary
+  },
+  killList: Array.from(detectedTrackers.values()),
+  timeline: [
+    { year: "2020", size: (mb * 0.45).toFixed(2) },
+    { year: "2026", size: mb.toFixed(2) },
+  ]
+});
+    
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   } finally {
