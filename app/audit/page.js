@@ -11,13 +11,13 @@ import CodeAnalysisWidget from "@/components/dashboard/CodeAnalysisWidget";
 function AuditContent() {
     const searchParams = useSearchParams();
     const urlParam = searchParams.get('url');
-    
+
     // Core State
     const [url] = useState(urlParam || 'google.com');
     const [auditData, setAuditData] = useState(null);
     const [scanning, setScanning] = useState(true);
     const [error, setError] = useState(null);
-    
+
     // UI Progress State
     const [scanProgress, setScanProgress] = useState(0);
     const [scanStep, setScanStep] = useState("Initializing Forensic Engine...");
@@ -47,16 +47,16 @@ function AuditContent() {
                 if (isMounted) {
                     setScanProgress(45);
                     setScanStep("Running Lighthouse Performance Audit...");
-                    
+
                     await new Promise(r => setTimeout(r, 800));
-                    
+
                     setScanProgress(75);
                     setScanStep("Analyzing Security & Calculating Carbon Footprint...");
-                    
+
                     setAuditData(data);
                     setScanProgress(100);
                     setScanStep("Audit Verified: Report Ready");
-                    
+
                     setTimeout(() => {
                         if (isMounted) setScanning(false);
                     }, 800);
@@ -138,46 +138,40 @@ function AuditContent() {
                         </p>
                     </div>
 
-                    <div className="hidden md:flex gap-4">
-                        <button className="flex items-center gap-2 px-4 py-2 bg-surface-dark border border-white/5 rounded-full text-xs font-bold uppercase tracking-wider text-gray-400 hover:text-primary hover:border-primary/50 transition-all cursor-pointer">
-                            <span className="material-symbols-outlined text-lg">code</span>
-                            View Code
-                        </button>
-                        <button className="flex items-center gap-2 px-4 py-2 bg-primary text-black rounded-full text-xs font-bold uppercase tracking-wider hover:bg-white transition-colors shadow-[0_0_15px_rgba(26,224,181,0.3)] cursor-pointer">
-                            <span className="material-symbols-outlined text-lg">download</span>
-                            Report
-                        </button>
-                    </div>
+                   
                 </header>
 
                 {/* Bento Grid Layout */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-min animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-                    <ScoreCard 
-                        score={auditData?.scores?.sustainability} 
-                        co2={auditData?.metrics?.co2} 
+                    <ScoreCard
+                        score={auditData?.scores?.sustainability}
+                        co2={auditData?.metrics?.co2}
                     />
-                    <RotRadarWidget 
+                    <RotRadarWidget
                         scores={{
                             ...auditData?.scores,
                             seo: auditData?.seo?.score || 0,
-                            bestPrac: auditData?.security?.score || 0 
-                        }} 
+                            bestPrac: auditData?.security?.score || 0
+                        }}
                     />
-                    <MetricTiles 
+                    <MetricTiles
                         metrics={auditData?.metrics}
-                        seo={auditData?.seo} 
+                        seo={auditData?.seo}
                     />
-                    <BloatTimelineWidget 
+                    {/* <BloatTimelineWidget 
                         timeline={auditData?.timeline} 
-                    />
-                    <CodeAnalysisWidget 
-                        url={url} 
+                    /> */}
+
+                </div>
+                <div className='mt-10'>
+                    <CodeAnalysisWidget
+                        url={url}
                         trackers={auditData?.killList}
                         seo={auditData?.seo}
-                        dangerReport={auditData?.security?.dangers || []} 
+                        da
+                        ngerReport={auditData?.security?.dangers || []}
                     />
                 </div>
-
                 {/* LIGHTHOUSE SECTION */}
                 {auditData?.lighthouse && (
                     <div className="mt-8 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
@@ -199,11 +193,10 @@ function AuditContent() {
                                     <div className="mb-2">
                                         <span className="material-symbols-outlined text-3xl text-orange-400">speed</span>
                                     </div>
-                                    <div className={`text-4xl font-bold mb-1 ${
-                                        auditData.lighthouse.scores.performance >= 90 ? 'text-green-400' :
-                                        auditData.lighthouse.scores.performance >= 50 ? 'text-yellow-400' :
-                                        'text-red-400'
-                                    }`}>
+                                    <div className={`text-4xl font-bold mb-1 ${auditData.lighthouse.scores.performance >= 90 ? 'text-green-400' :
+                                            auditData.lighthouse.scores.performance >= 50 ? 'text-yellow-400' :
+                                                'text-red-400'
+                                        }`}>
                                         {auditData.lighthouse.scores.performance}
                                     </div>
                                     <div className="text-xs text-gray-400 uppercase tracking-wider">Performance</div>
@@ -214,11 +207,10 @@ function AuditContent() {
                                     <div className="mb-2">
                                         <span className="material-symbols-outlined text-3xl text-blue-400">accessibility</span>
                                     </div>
-                                    <div className={`text-4xl font-bold mb-1 ${
-                                        auditData.lighthouse.scores.accessibility >= 90 ? 'text-green-400' :
-                                        auditData.lighthouse.scores.accessibility >= 50 ? 'text-yellow-400' :
-                                        'text-red-400'
-                                    }`}>
+                                    <div className={`text-4xl font-bold mb-1 ${auditData.lighthouse.scores.accessibility >= 90 ? 'text-green-400' :
+                                            auditData.lighthouse.scores.accessibility >= 50 ? 'text-yellow-400' :
+                                                'text-red-400'
+                                        }`}>
                                         {auditData.lighthouse.scores.accessibility}
                                     </div>
                                     <div className="text-xs text-gray-400 uppercase tracking-wider">Accessibility</div>
@@ -229,11 +221,10 @@ function AuditContent() {
                                     <div className="mb-2">
                                         <span className="material-symbols-outlined text-3xl text-purple-400">verified</span>
                                     </div>
-                                    <div className={`text-4xl font-bold mb-1 ${
-                                        auditData.lighthouse.scores.bestPractices >= 90 ? 'text-green-400' :
-                                        auditData.lighthouse.scores.bestPractices >= 50 ? 'text-yellow-400' :
-                                        'text-red-400'
-                                    }`}>
+                                    <div className={`text-4xl font-bold mb-1 ${auditData.lighthouse.scores.bestPractices >= 90 ? 'text-green-400' :
+                                            auditData.lighthouse.scores.bestPractices >= 50 ? 'text-yellow-400' :
+                                                'text-red-400'
+                                        }`}>
                                         {auditData.lighthouse.scores.bestPractices}
                                     </div>
                                     <div className="text-xs text-gray-400 uppercase tracking-wider">Best Practices</div>
@@ -244,11 +235,10 @@ function AuditContent() {
                                     <div className="mb-2">
                                         <span className="material-symbols-outlined text-3xl text-green-400">search</span>
                                     </div>
-                                    <div className={`text-4xl font-bold mb-1 ${
-                                        auditData.lighthouse.scores.seo >= 90 ? 'text-green-400' :
-                                        auditData.lighthouse.scores.seo >= 50 ? 'text-yellow-400' :
-                                        'text-red-400'
-                                    }`}>
+                                    <div className={`text-4xl font-bold mb-1 ${auditData.lighthouse.scores.seo >= 90 ? 'text-green-400' :
+                                            auditData.lighthouse.scores.seo >= 50 ? 'text-yellow-400' :
+                                                'text-red-400'
+                                        }`}>
                                         {auditData.lighthouse.scores.seo}
                                     </div>
                                     <div className="text-xs text-gray-400 uppercase tracking-wider">SEO</div>
@@ -305,10 +295,9 @@ function AuditContent() {
                                         {auditData.lighthouse.opportunities.map((opp, idx) => (
                                             <div key={idx} className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg p-3">
                                                 <div className="flex items-start gap-3">
-                                                    <div className={`px-2 py-1 rounded text-xs font-bold ${
-                                                        opp.score < 50 ? 'bg-red-500/20 text-red-400' :
-                                                        'bg-yellow-500/20 text-yellow-400'
-                                                    }`}>
+                                                    <div className={`px-2 py-1 rounded text-xs font-bold ${opp.score < 50 ? 'bg-red-500/20 text-red-400' :
+                                                            'bg-yellow-500/20 text-yellow-400'
+                                                        }`}>
                                                         {opp.score}
                                                     </div>
                                                     <div className="flex-1">
@@ -450,11 +439,10 @@ function AuditContent() {
                                 </div>
                                 <div className="ml-auto flex items-center gap-3">
                                     <div className="text-right">
-                                        <div className={`text-4xl font-bold ${
-                                            auditData.security.score >= 80 ? 'text-green-400' :
-                                            auditData.security.score >= 60 ? 'text-yellow-400' :
-                                            'text-red-400'
-                                        }`}>
+                                        <div className={`text-4xl font-bold ${auditData.security.score >= 80 ? 'text-green-400' :
+                                                auditData.security.score >= 60 ? 'text-yellow-400' :
+                                                    'text-red-400'
+                                            }`}>
                                             {auditData.security.score}
                                         </div>
                                         <div className="text-xs text-gray-400 uppercase tracking-wider">
@@ -493,35 +481,32 @@ function AuditContent() {
                                     </h3>
                                     <div className="space-y-3">
                                         {auditData.security.dangers.map((danger, idx) => (
-                                            <div 
-                                                key={idx} 
-                                                className={`rounded-lg p-4 border ${
-                                                    danger.severity === 'critical' ? 'bg-red-500/10 border-red-500/30' :
-                                                    danger.severity === 'high' ? 'bg-orange-500/10 border-orange-500/30' :
-                                                    danger.severity === 'medium' ? 'bg-yellow-500/10 border-yellow-500/30' :
-                                                    'bg-blue-500/10 border-blue-500/30'
-                                                }`}
+                                            <div
+                                                key={idx}
+                                                className={`rounded-lg p-4 border ${danger.severity === 'critical' ? 'bg-red-500/10 border-red-500/30' :
+                                                        danger.severity === 'high' ? 'bg-orange-500/10 border-orange-500/30' :
+                                                            danger.severity === 'medium' ? 'bg-yellow-500/10 border-yellow-500/30' :
+                                                                'bg-blue-500/10 border-blue-500/30'
+                                                    }`}
                                             >
                                                 <div className="flex items-start gap-3">
-                                                    <span className={`material-symbols-outlined text-2xl ${
-                                                        danger.severity === 'critical' ? 'text-red-400' :
-                                                        danger.severity === 'high' ? 'text-orange-400' :
-                                                        danger.severity === 'medium' ? 'text-yellow-400' :
-                                                        'text-blue-400'
-                                                    }`}>
+                                                    <span className={`material-symbols-outlined text-2xl ${danger.severity === 'critical' ? 'text-red-400' :
+                                                            danger.severity === 'high' ? 'text-orange-400' :
+                                                                danger.severity === 'medium' ? 'text-yellow-400' :
+                                                                    'text-blue-400'
+                                                        }`}>
                                                         {danger.type === 'security' ? 'security' :
-                                                         danger.type === 'privacy' ? 'visibility_off' :
-                                                         danger.type === 'malicious' ? 'virus' :
-                                                         'code'}
+                                                            danger.type === 'privacy' ? 'visibility_off' :
+                                                                danger.type === 'malicious' ? 'virus' :
+                                                                    'code'}
                                                     </span>
                                                     <div className="flex-1">
                                                         <div className="flex items-center gap-2 mb-2">
-                                                            <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${
-                                                                danger.severity === 'critical' ? 'bg-red-500/20 text-red-300' :
-                                                                danger.severity === 'high' ? 'bg-orange-500/20 text-orange-300' :
-                                                                danger.severity === 'medium' ? 'bg-yellow-500/20 text-yellow-300' :
-                                                                'bg-blue-500/20 text-blue-300'
-                                                            }`}>
+                                                            <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${danger.severity === 'critical' ? 'bg-red-500/20 text-red-300' :
+                                                                    danger.severity === 'high' ? 'bg-orange-500/20 text-orange-300' :
+                                                                        danger.severity === 'medium' ? 'bg-yellow-500/20 text-yellow-300' :
+                                                                            'bg-blue-500/20 text-blue-300'
+                                                                }`}>
                                                                 {danger.severity}
                                                             </span>
                                                             <span className="text-xs text-gray-500 uppercase">{danger.type}</span>
