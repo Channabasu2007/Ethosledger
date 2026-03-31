@@ -11,7 +11,6 @@ export default function Header() {
                 <h1 className="text-xl font-bold tracking-tight text-white">Ethosledger</h1>
             </div>
             <nav className="hidden md:flex items-center gap-8">
-                <Link target="_blank" className="text-sm font-medium text-gray-400 hover:text-primary transition-colors" href="https://github.com/Channabasu2007/Ethosledger">Github</Link>
                 <Link target="_blank" className="text-sm font-medium text-gray-400 hover:text-primary transition-colors" href="/hall-of-shame">Hall of Shame</Link>
             </nav>
 
